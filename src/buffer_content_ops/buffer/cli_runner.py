@@ -34,7 +34,7 @@ class BufferCliRunner:
             "channels",
             "list",
             "--fields",
-            "items.{id,service,name,isDisconnected,organizationId}",
+            "id,service,name,isDisconnected,organizationId",
             "--output",
             "json",
         ]
@@ -53,7 +53,7 @@ class BufferCliRunner:
 
         try:
             data = json.loads(proc.stdout)
-            items = data.get("items", [])
+            items = data if isinstance(data, list) else data.get("items", [])
             return [
                 BufferChannel(
                     id=item["id"],
