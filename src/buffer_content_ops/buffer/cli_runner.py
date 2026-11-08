@@ -4,7 +4,7 @@ import json
 import subprocess
 from typing import Any
 
-from ..models import BufferChannel, BufferMutationPayload
+from ..models import BufferChannel, BufferContentItemPayload, BufferMutationPayload
 
 
 class BufferCliRunner:
@@ -101,6 +101,62 @@ class BufferCliRunner:
                 "dryRun": payload.dry_run,
                 "data": result,
                 "message": "Draft created successfully in Buffer"
+                if not payload.dry_run
+                else "Dry-run validation successful",
+            }
+        else:
+            return {
+                "success": False,
+                "exitCode": proc.returncode,
+                "dryRun": payload.dry_run,
+                "stderr": proc.stderr,
+                "stdout": proc.stdout,
+                "error": f"Buffer CLI execution failed with exit code {proc.returncode}",
+            }
+
+    def create_content_item(self, payload: BufferContentItemPayload) -> dict[str, Any]:
+        """Create a multi-channel content item across Instagram & LinkedIn."""
+        posts_payload = []
+        for p in payload.posts:
+            variant: dict[str, Any] = {
+                "channelId": p.channel_id,
+                "text": p.text,
+                "mode": p.mode,
+                "schedulingType": p.scheduling_type,
+                "saveToDraft": p.save_to_draft,
+                "aiAssisted": p.ai_assisted,
+            }
+            if p.image_url:
+                variant["assets"] = [{"image": {"url": p.image_url}}]
+                variant["metadata"] = {"instagram": {"type": "post", "shouldShareToFeed": True}}
+            posts_payload.append(variant)
+
+        json_payload = {
+            "organizationId": payload.organization_id,
+            "title": payload.title or "Cross-Platform Announcement",
+            "posts": posts_payload,
+        }
+
+        cmd = [self.binary, "contentItems", "create", "--json", json.dumps(json_payload)]
+        if payload.dry_run:
+            cmd.append("--dry-run")
+        else:
+            cmd.extend(["--output", "json"])
+
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+        if proc.returncode == 0:
+            try:
+                result = json.loads(proc.stdout) if proc.stdout else {}
+            except json.JSONDecodeError:
+                result = {"raw": proc.stdout}
+
+            return {
+                "success": True,
+                "exitCode": proc.returncode,
+                "dryRun": payload.dry_run,
+                "data": result,
+                "message": "Content item created across channels"
                 if not payload.dry_run
                 else "Dry-run validation successful",
             }

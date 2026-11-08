@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     buffer_api_key: str | None = None
     buffer_organization_id: str | None = None
     buffer_linkedin_channel_id: str | None = None
+    buffer_instagram_channel_id: str | None = None
     buffer_post_mode: str = "draft"  # draft | addToQueue | customScheduled
     github_token: str | None = None
 

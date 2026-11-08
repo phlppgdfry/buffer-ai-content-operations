@@ -99,3 +99,37 @@ class PipelineResult(BaseModel):
     quality_review: QualityGateReview
     raw_buffer_response: dict[str, Any] | None = None
     error_message: str | None = None
+
+
+class PostVariant(BaseModel):
+    """Channel-specific variant within a multi-channel content item."""
+
+    channel_id: str
+    text: str
+    mode: str = "addToQueue"
+    scheduling_type: str = "automatic"
+    save_to_draft: bool = True
+    ai_assisted: bool = True
+    image_url: str | None = None
+
+
+class BufferContentItemPayload(BaseModel):
+    """Payload sent to Buffer contentItems.create mutation for cross-posting."""
+
+    organization_id: str
+    title: str | None = None
+    posts: list[PostVariant] = Field(default_factory=list)
+    dry_run: bool = False
+
+
+class MultiChannelPipelineResult(BaseModel):
+    """Result of cross-platform (Instagram & LinkedIn) dispatch."""
+
+    success: bool
+    content_item_id: str | None = None
+    channels: list[str] = Field(default_factory=list)
+    status: str
+    narrative: BusinessNarrative
+    quality_review: QualityGateReview
+    raw_buffer_response: dict[str, Any] | None = None
+    error_message: str | None = None

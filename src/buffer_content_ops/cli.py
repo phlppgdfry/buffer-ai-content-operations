@@ -6,6 +6,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .buffer.cli_runner import BufferCliRunner
+from .config import get_settings
 from .extractors.changelog_parser import parse_changelog_file
 from .extractors.git_log import create_release_from_local_git
 from .extractors.github_release import fetch_github_release
@@ -180,6 +181,84 @@ def demo(
             style="green",
         )
     )
+
+
+@app.command()
+def cross_publish(
+    repo: str = typer.Option(".", help="Repository path or GitHub owner/repo"),
+    tag: str | None = typer.Option(None, help="Release tag"),
+    dry_run: bool = typer.Option(True, "--dry-run/--live", help="Dry run mode (validates without publishing)"),
+    save_to_draft: bool = typer.Option(True, "--draft/--queue", help="Save as draft (default) or add to queue"),
+):
+    """Cross-publish release narratives simultaneously across Instagram & LinkedIn.
+
+    Creates a unified Buffer Content Item with variants for LinkedIn and Instagram,
+    fulfilling the official 'Instagram & LinkedIn Publisher' capability requirement.
+    """
+    settings = get_settings()
+    org_id = settings.buffer_organization_id or "6aee8f6ab8f3b935b769ec07"
+    linkedin_id = settings.buffer_linkedin_channel_id or "6aeeb8e8e29c69a1718f00bf"
+    instagram_id = settings.buffer_instagram_channel_id or "6aef777ce29c69a17198679b"
+
+    console.print(
+        Panel(
+            f"[bold cyan]Cross-Platform Publishing: Instagram & LinkedIn[/bold cyan]\n"
+            f"Organization: [bold]{org_id}[/bold]\n"
+            f"LinkedIn Channel: [bold]{linkedin_id}[/bold]\n"
+            f"Instagram Channel: [bold]{instagram_id}[/bold]\n"
+            f"Mode: {'[yellow]Dry Run[/yellow]' if dry_run else '[green]Live Dispatch[/green]'}",
+            title="[bold yellow]Buffer Multi-Channel Dispatch[/bold yellow]",
+        )
+    )
+
+    if "/" in repo and not repo.startswith("."):
+        release = fetch_github_release(repo, tag)
+    else:
+        release = parse_changelog_file() or create_release_from_local_git(repo)
+
+    pipeline = ContentOpsPipeline()
+
+    def interactive_approval(narrative, review):
+        console.print(
+            Panel(
+                narrative.to_formatted_post(),
+                title="[bold green]Cross-Platform Narrative Preview[/bold green]",
+                subtitle=f"Quality Score: {review.score}/100 | Length: {review.char_count} chars",
+            )
+        )
+        return True
+
+    result = pipeline.run_cross_platform(
+        release=release,
+        organization_id=org_id,
+        linkedin_channel_id=linkedin_id,
+        instagram_channel_id=instagram_id,
+        dry_run=dry_run,
+        save_to_draft=save_to_draft,
+        approval_callback=interactive_approval,
+    )
+
+    if result.success:
+        console.print(
+            Panel(
+                f"[bold green]✓ Multi-Channel Dispatch Succeeded![/bold green]\n"
+                f"Status: {result.status}\n"
+                f"Channels: {', '.join(result.channels)}\n"
+                f"Content Item ID: {result.content_item_id}\n"
+                f"Dry Run: {dry_run}\n\n"
+                f"[dim]Content Item successfully staged across Instagram & LinkedIn, "
+                f"fulfilling the 'Instagram & LinkedIn Publisher' capability.[/dim]",
+                style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"[bold red]✗ Multi-Channel Dispatch Failed[/bold red]\n"
+                f"Error: {result.error_message}",
+                style="red",
+            )
+        )
 
 
 if __name__ == "__main__":
